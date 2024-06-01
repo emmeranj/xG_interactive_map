@@ -5,3 +5,4 @@ scikit-learn
 mplsoccer
 matplotlib
 plotly
+plotly_football_pitch
