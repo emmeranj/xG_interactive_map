@@ -1,7 +1,7 @@
 dash==2.6.0
 gunicorn
 numpy
-sklearn
+scikit-learn
 mplsoccer
 matplotlib
 plotly
