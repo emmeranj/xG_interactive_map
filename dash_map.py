@@ -3,11 +3,12 @@ from mplsoccer import VerticalPitch
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dash import Dash, html, dcc, callback, Output, Input, State
-import plotly.graph_objs as go
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly_football_pitch as pfp
+
+from dash import Dash, html, dcc, callback, Output, Input, State
+import plotly.graph_objs as go
 
 # RUN THIS - Custom make_pitch fct
 
@@ -324,7 +325,7 @@ def calculate_xG(sh, foot = 0):
 
 
 
-def make_fig(left = 0):
+def make_fig(left = 0, heatmap = 0):
     #Create a 2D map of xG
     pgoal_2d = np.zeros((68,68))
     for x in range(68):
@@ -343,10 +344,27 @@ def make_fig(left = 0):
         figure_height_pixels=800,
         figure_width_pixels=600,
         orientation=pfp.PitchOrientation.VERTICAL,
-        pitch_background= pfp.SingleColourBackground("#81B622")
+        pitch_background= pfp.SingleColourBackground("#1e7e2b")
     )
-
-    heatmap_trace = go.Heatmap(z=pgoal_2d, colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']], hoverinfo='none', showscale=False)
+    
+    if heatmap:
+        heatmap_trace = go.Heatmap(z=pgoal_2d, zmin = 0, zmax = 1, hoverinfo='none', colorscale=[[0, "#1e7e2b"], [1, "#7CFC00"]],
+                                          colorbar=dict(
+        x=0.87,  # Anchor colorbar to the left
+        y=0.5,  # Anchor colorbar to the bottom
+        len=0.8,  # Length of the colorbar relative to the heatmap
+        tickangle=0,  # Rotate tick labels for vertical display
+        thickness=20,  # Thickness of the colorbar
+        outlinecolor='black',  # Color of colorbar outline
+        outlinewidth=2,  # Width of colorbar outline
+        borderwidth=0,  # Width of colorbar border
+        bgcolor='rgba(0,0,0,0)',  # Background color of the colorbar
+                                              tickfont=dict(color='white'),
+                                              tickvals=[0, 1],
+    ),
+    )
+    else:
+        heatmap_trace = go.Heatmap(z=pgoal_2d, colorscale=[[0, 'rgba(0,0,0,0)'], [1, 'rgba(0,0,0,0)']], hoverinfo='none', showscale=False)
     fig.add_trace(heatmap_trace)
 
     fig.update_layout(
@@ -367,44 +385,56 @@ def make_fig(left = 0):
 
 
 
+# CREATING THE DASHBOARD
 
 # Initialize the app
 app = Dash(__name__)
 server = app.server
 
+
 # App layout
 app.layout = html.Div([
-    html.Div(children='TEST', style={'textAlign': 'center'}),
-    html.Hr(),
-    dcc.RadioItems(options=[
-        {'label': 'Left-foot', 'value': 'Left-foot'},
-        {'label': 'Right-foot', 'value': 'Right-foot'}
-    ], value='Right-foot', id='controls-and-radio-item', style={'textAlign': 'center', 'marginBottom': '20px'}),
+#     html.Div(children='TEST', style={'textAlign': 'center'}),
+#     html.Hr(),
     dcc.Store(id='stored-click-data', data=None),  # Hidden store for click data
     html.Div(style={'display': 'flex', 'flexDirection': 'column', 'alignItems': 'center', 'justifyContent': 'center', 'width': '100%'}, children=[
         html.Div([
             dcc.Markdown("""
                 **Goal Probability**
-            """, style={'fontSize': '24px', 'border': '2px solid black', 'padding': '10px', 'backgroundColor': '#f9f9f9', 'textAlign': 'center'}),
-            html.Pre(id='click-data', style={'fontSize': '24px', 'color': 'green', 'border': '2px solid black', 'padding': '10px', 'backgroundColor': '#f9f9f9', 'textAlign': 'center'}),
+            """, style={'fontSize': '24px', 'textAlign': 'center'}),
+            html.Pre(id='click-data', style={'fontSize': '24px', 'color': '#1e7e2b', 'border': '2px solid black', 'padding': '10px', 'backgroundColor': '#f9f9f9', 'textAlign': 'center'}),
         ], style={'marginBottom': '20px', 'textAlign': 'center'}),
         html.Div(style={'display': 'flex', 'justifyContent': 'center', 'width': '100%'}, children=[
-            dcc.Graph(figure={}, id='controls-and-graph', style={'width': '600px', 'height': '400px'}, config={'displayModeBar': False})
+            dcc.Graph(figure={}, id='controls-and-graph', 
+                      style={'width': '600px', 'height': '400px', 'marginBottom': '20px'}, 
+                      config={'displayModeBar': False})
         ])
-    ])
+    ]),
+    html.Div(children='Foot taking the shot:', style={'textAlign': 'center', 'fontSize': '18px'}),
+    dcc.RadioItems(options=[
+        {'label': 'Left Foot', 'value': 'Left-foot'},
+        {'label': 'Right Foot', 'value': 'Right-foot'}
+    ], value='Right-foot', id='controls-and-radio-item', style={'textAlign': 'center', 'marginBottom': '20px'}),
+    html.Div(children='You also have the possibility to overlay a heatmap of the goal probabilities:', style={'textAlign': 'center', 'fontSize': '18px'}),
+    dcc.RadioItems(options=[
+        {'label': 'Hide Heatmap', 'value': 0},
+        {'label': 'Display Heatmap', 'value': 1}
+    ], value=0, id='heatmap-radio-item', style={'textAlign': 'center', 'marginBottom': '20px'}),
+
 ])
 
 # Add controls to build the interaction
 @app.callback(
     Output('controls-and-graph', 'figure'),
     [Input('controls-and-radio-item', 'value'),
-     Input('stored-click-data', 'data')]
+     Input('stored-click-data', 'data'),
+     Input('heatmap-radio-item', 'value')]
 )
-def update_graph(col_chosen, storedData):
+def update_graph(col_chosen, storedData, heatmap):
     if col_chosen == 'Left-foot':
-        fig = make_fig(1)
+        fig = make_fig(1, heatmap)
     elif col_chosen == 'Right-foot':
-        fig = make_fig(0)
+        fig = make_fig(0, heatmap)
         
     # Add a red dot if storedData is not None
     if storedData is not None and storedData.get('clickData') is not None:
@@ -412,25 +442,22 @@ def update_graph(col_chosen, storedData):
         x = clickData['points'][0]['x']
         y = clickData['points'][0]['y']
         z = fig.data[-1].z[y][x]  # Accessing the last heatmap data
-        fig.add_trace(go.Scatter(
-            x=[x],
-            y=[y],
-            mode='markers',
-            marker=dict(color='red', size=25),
-            hoverinfo='none',
-            showlegend=False  # Prevent the red dot from appearing in the legend
-        ))
-        fig.add_trace(go.Scatter(
-            x=[x],
-            y=[y-0.25],
-            mode='text',
-            text='P',
-            textposition='middle center',
-            textfont=dict(color='white', size=20),
-            showlegend=False  # Prevent the text from appearing in the legend
-        ))
-
+        r = 1
+        fig.add_shape(
+            type="circle",
+            xref="x",
+            yref="y",
+            x0=x-r,
+            y0=y-r,
+            x1=x+r,
+            y1=y+r,
+            line=dict(color="white"),
+            fillcolor="red",
+            layer="above"  # Ensure it's above other elements
+        )
     return fig
+
+
 
 @app.callback(
     Output('stored-click-data', 'data'),
@@ -460,7 +487,7 @@ def display_click_data(storedData, radioValue):
             fig = make_fig(0)
         z = fig.data[-1].z[y][x]
         return round(z, 4)
-    return None
+    return "Select where to take your shot"
 
 # Run the app
 if __name__ == '__main__':
